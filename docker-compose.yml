@@ -1,0 +1,11 @@
+services:
+  liftup-bot:
+    build: .
+    image: liftup-bot:latest
+    container_name: liftup-bot
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"   # web-paneeli: http://<palvelin>:8080
+    volumes:
+      - ./data:/app/data

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Liftup LAN – Bottipaneeli</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23c6f432'/><path d='M9 22V10h3v9h7v3z' fill='%23111'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Kirjautuminen -->
+  <main id="login" class="login hidden">
+    <form id="login-form" class="login-card">
+      <div class="brand big"><span class="mark">L</span><div><b>LIFTUP</b><small>LAN // bottipaneeli</small></div></div>
+      <label>Salasana<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+      <button class="btn primary" type="submit">Kirjaudu</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </main>
+
+  <!-- Sovellus -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="mark">L</span><div><b>LIFTUP</b><small>LAN // botti</small></div></div>
+      <nav id="nav">
+        <a href="#yleiskatsaus" data-view="yleiskatsaus"><i>◎</i>Yleiskatsaus</a>
+        <a href="#tiimit" data-view="tiimit"><i>⚑</i>Tiimit</a>
+        <a href="#ilmoitukset" data-view="ilmoitukset"><i>✦</i>Ilmoitukset</a>
+        <a href="#serverit" data-view="serverit"><i>▤</i>Serverit</a>
+        <a href="#minecraft" data-view="minecraft"><i>◧</i>Minecraft</a>
+        <a href="#valvonta" data-view="valvonta"><i>⛨</i>Valvonta</a>
+        <a href="#loki" data-view="loki"><i>≡</i>Loki</a>
+        <a href="#asetukset" data-view="asetukset"><i>⚙</i>Asetukset</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="bot-pill" class="pill">…</div>
+        <button id="logout" class="btn ghost small">Kirjaudu ulos</button>
+      </div>
+    </aside>
+    <main id="view" class="view"></main>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+  <dialog id="modal"><form method="dialog" id="modal-body"></form></dialog>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
