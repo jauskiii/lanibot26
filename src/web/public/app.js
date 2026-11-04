@@ -225,7 +225,12 @@ views.tiimit = async () => {
           <label>Nimi<input name="name" value="${esc(team.name)}" required></label>
           <label>Väri<input name="color" type="color" value="${esc(team.color)}"></label>
           <div class="row"><button class="btn primary">Tallenna</button><button class="btn ghost" value="cancel">Peruuta</button></div>`,
-          async (d, btn) => { const r = await act(btn, () => api('PATCH', `/teams/${id}`, d), 'Tallennettu'); if (!r) return false; views.tiimit(); });
+          async (d, btn) => {
+            const r = await act(btn, () => api('PATCH', `/teams/${id}`, d),
+              (x) => (x.channelsRenaming ? 'Tallennettu – kanavat nimetään uudelleen (Discord rajoittaa: 2 nimenvaihtoa / 10 min)' : 'Tallennettu'));
+            if (!r) return false;
+            views.tiimit();
+          });
       case 'bulk':
         return modal(`<h2>Lisää useita – ${esc(team.name)}</h2>
           <p class="muted small">Yksi per rivi (tai pilkuilla): käyttäjänimi, näyttönimi, @mention tai Discord-ID.</p>
