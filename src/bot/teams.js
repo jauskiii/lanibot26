@@ -109,15 +109,36 @@ export function teamService(ctx) {
   async function update(id, { name, color }) {
     const guild = ctx.requireGuild();
     const team = get(id);
-    if (name && name !== team.name) {
-      if (find(name)) throw new HttpError(409, 'Saman niminen tiimi on jo olemassa');
+    const oldName = team.name;
+    if (name && name.trim() !== team.name) {
+      const clash = find(name.trim());
+      if (clash && clash.id !== team.id) throw new HttpError(409, 'Saman niminen tiimi on jo olemassa');
       team.name = String(name).trim();
     }
     if (color) team.color = color;
     const role = await ensureRole(guild, team);
     await role.edit({ name: team.name, colors: { primaryColor: hexToInt(team.color) }, reason: 'Liftup-botti: tiimin muokkaus' });
     ctx.store.save();
-    return team;
+
+    // Kanavien nimet perässä. Discord sallii vain 2 nimenvaihtoa / kanava / 10 min,
+    // joten ajetaan taustalla, ettei web-paneeli jää odottamaan rajoituksen loppumista.
+    let channelsRenaming = false;
+    if (team.name !== oldName) {
+      const renames = [
+        [team.textChannelId, slug(team.name)],
+        [team.voiceChannelId, `🔊 ${team.name}`],
+      ]
+        .map(([cid, newName]) => [guild.channels.cache.get(cid), newName])
+        .filter(([ch, newName]) => ch && ch.name !== newName);
+      if (renames.length) {
+        channelsRenaming = true;
+        Promise.all(renames.map(([ch, newName]) => ch.setName(newName, 'Liftup-botti: tiimi nimettiin uudelleen')))
+          .then(() => ctx.log('info', `${oldName} → ${team.name}: kanavat nimetty uudelleen`))
+          .catch((err) => ctx.log('error', `${team.name}: kanavien nimenvaihto epäonnistui: ${err.message}`));
+      }
+      ctx.log('info', `Tiimi nimetty uudelleen: ${oldName} → ${team.name}`);
+    }
+    return { ...team, channelsRenaming };
   }
 
   async function remove(id, { deleteRole = true, deleteChannels = true } = {}) {
