@@ -195,7 +195,7 @@ export function startWeb(ctx) {
   }));
 
   // ---------- Ilmoitukset ----------
-  const ANNOUNCE_KEYS = ['channelId', 'channelIds', 'title', 'body', 'color', 'mention', 'serverIds', 'pin', 'image', 'sendAt'];
+  const ANNOUNCE_KEYS = ['channelId', 'channelIds', 'teams', 'serverNames', 'title', 'body', 'color', 'mention', 'serverIds', 'pin', 'image', 'sendAt'];
   app.get('/api/announcements', wrap(() => ctx.store.data.announcements));
   app.post('/api/announcements', wrap((req) => {
     const input = pick(req.body || {}, ANNOUNCE_KEYS);

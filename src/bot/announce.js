@@ -39,26 +39,56 @@ export function announceService(ctx) {
     return { content: `<@&${mention}>`, allowedMentions: { roles: [mention] } };
   }
 
-  /** Kanavat: channelIds-lista (uusi) tai yksittäinen channelId (vanha/API), muuten oletuskanava. */
-  function resolveChannelIds(input) {
-    const ids = [...new Set([...(Array.isArray(input.channelIds) ? input.channelIds : []), input.channelId].filter(Boolean))];
-    if (!ids.length && data().settings.announceChannelId) ids.push(data().settings.announceChannelId);
-    if (!ids.length) throw new HttpError(400, 'Valitse vähintään yksi kanava (tai aseta oletuskanava asetuksista)');
-    if (ids.length > 25) throw new HttpError(400, 'Enintään 25 kanavaa kerralla');
-    return ids;
+  /**
+   * Kohteet: channelIds-lista / channelId, sekä teams-lista (tiimien nimet tai ID:t → niiden omat kanavat).
+   * Tiimi ilman omaa kanavaa → ilmoitus oletuskanavalle ja sen rooli pingataan siellä.
+   * Ei mitään → oletuskanava.
+   */
+  function resolveTargets(input) {
+    const ids = [...(Array.isArray(input.channelIds) ? input.channelIds : []), input.channelId].filter(Boolean);
+    const fallbackRoleIds = [];
+    const notes = [];
+    for (const name of Array.isArray(input.teams) ? input.teams : []) {
+      const team = ctx.services.teams.find(String(name));
+      if (!team) { notes.push({ team: name, reason: 'Tiimiä ei löytynyt botista (synkronoi tiimit ensin)' }); continue; }
+      if (team.textChannelId) ids.push(team.textChannelId);
+      else if (team.roleId) fallbackRoleIds.push(team.roleId);
+    }
+    if (fallbackRoleIds.length && data().settings.announceChannelId) ids.push(data().settings.announceChannelId);
+    const unique = [...new Set(ids)];
+    if (!unique.length && data().settings.announceChannelId) unique.push(data().settings.announceChannelId);
+    if (!unique.length) throw new HttpError(400, 'Valitse vähintään yksi kanava (tai aseta oletuskanava asetuksista)');
+    if (unique.length > 25) throw new HttpError(400, 'Enintään 25 kanavaa kerralla');
+    return { channelIds: unique, fallbackRoleIds, notes };
+  }
+  const resolveChannelIds = (input) => resolveTargets(input).channelIds;
+
+  /** serverNames (esim. turnausjärjestelmän kentän nimi) → samannimiset palvelimet. */
+  function resolveServerIds(input) {
+    const ids = new Set(Array.isArray(input.serverIds) ? input.serverIds : []);
+    for (const name of Array.isArray(input.serverNames) ? input.serverNames : []) {
+      const s = data().servers.find((x) => x.name.toLowerCase() === String(name).trim().toLowerCase());
+      if (s) ids.add(s.id);
+    }
+    return [...ids];
   }
 
   async function send(input) {
     const guild = ctx.requireGuild();
-    const channelIds = resolveChannelIds(input);
-    if (!input.title && !input.body && !(input.serverIds || []).length) throw new HttpError(400, 'Ilmoitus on tyhjä');
+    const { channelIds, fallbackRoleIds, notes } = resolveTargets(input);
+    input = { ...input, serverIds: resolveServerIds(input) };
+    if (!input.title && !input.body && !input.serverIds.length) throw new HttpError(400, 'Ilmoitus on tyhjä');
 
     const embed = buildEmbed(input);
-    // "team" = pingaa kullakin tiimikanavalla sen tiimin roolia
+    // "team" = pingaa kullakin tiimikanavalla sen tiimin roolia (oletuskanavalla kanavattomien tiimien roolit)
     const mentionFor = (channelId) => {
       if (input.mention !== 'team') return mentionContent(input.mention);
       const team = data().teams.find((t) => t.textChannelId === channelId);
-      return team?.roleId ? mentionContent(team.roleId) : mentionContent('none');
+      if (team?.roleId) return mentionContent(team.roleId);
+      if (fallbackRoleIds.length && channelId === data().settings.announceChannelId) {
+        return { content: fallbackRoleIds.map((r) => `<@&${r}>`).join(' '), allowedMentions: { roles: fallbackRoleIds } };
+      }
+      return mentionContent('none');
     };
     const sent = [];
     const failed = [];
@@ -90,7 +120,8 @@ export function announceService(ctx) {
     ctx.store.save();
     ctx.log('info', `Ilmoitus lähetetty ${sent.map((s) => `#${s.channelName}`).join(', ')}: ${record.title || '(ei otsikkoa)'}`);
     for (const f of failed) ctx.log('warn', `Ilmoitus epäonnistui ${f.channelName ? `#${f.channelName}` : f.channelId}: ${f.reason}`);
-    return { ...record, failed };
+    for (const n of notes) ctx.log('warn', `Ilmoitus: ${n.team}: ${n.reason}`);
+    return { ...record, failed, notes };
   }
 
   function schedule(input) {
