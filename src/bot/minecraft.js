@@ -126,7 +126,16 @@ export function minecraftService(ctx) {
       const out = await client.send(command);
       return out.replace(/§./g, '');
     } catch (err) {
-      throw new HttpError(502, `RCON-virhe: ${err.message}`);
+      const m = String(err.message || err);
+      const hint = /connection closed|ECONNRESET|socket hang up/i.test(m)
+        ? ' – portissa ei vastaa RCON. Tarkista server.properties: enable-rcon=true ja rcon.port=' + c.rconPort
+          + ', että portti ' + c.rconPort + ' on allokoitu Minecraft-serverille Pterodactylissa, ja käynnistä Minecraft uudelleen.'
+          + ' Älä käytä peliporttia 25565 RCON-porttina.'
+        : /ECONNREFUSED/i.test(m) ? ` – mikään ei kuuntele osoitteessa ${c.host}:${c.rconPort}. Onko Minecraft käynnissä ja portti allokoitu?`
+        : /timed? ?out|ETIMEDOUT/i.test(m) ? ` – ei vastausta osoitteesta ${c.host}:${c.rconPort} (palomuuri tai väärä osoite).`
+        : /auth/i.test(m) ? ' – väärä RCON-salasana (rcon.password).'
+        : '';
+      throw new HttpError(502, `RCON-virhe: ${m}${hint}`);
     } finally {
       client?.end().catch(() => {});
     }

@@ -3,6 +3,17 @@ import { gameIcon, serverLine } from './announce.js';
 
 const EPH = { flags: MessageFlags.Ephemeral };
 
+/**
+ * Yksi GLOBAALI komento. Discord näyttää "Supports Commands" -merkin vain sovelluksille, joilla on
+ * vähintään yksi globaali komento, ja Active Developer -merkki vaatii sen. Muut komennot pysyvät
+ * palvelinkohtaisina, koska ne näkyvät heti (globaalien päivitys voi viedä hetken).
+ */
+export function buildGlobalCommands() {
+  return [
+    new SlashCommandBuilder().setName('liftup').setDescription('Liftup-botin tiedot ja komennot'),
+  ];
+}
+
 export function buildCommands() {
   return [
     new SlashCommandBuilder()
@@ -92,6 +103,20 @@ export function commandHandler(ctx) {
   }
 
   const handlers = {
+    async liftup(i) {
+      const e = new EmbedBuilder()
+        .setTitle('🤖 Liftup-botti')
+        .setColor(0xc6f432)
+        .setDescription([
+          'Liftup LANien Discord-botti: turnaustiimit, ilmoitukset, peliroolit, Minecraft ja valvonta.',
+          '',
+          '**Kaikille:** `/serverit` · `/ip` · `/mc status` · `/mc whitelist`',
+          '**Ylläpidolle:** `/tiimi` · `/ilmoita` · `/varoita` · `/hiljennä` · `/siivoa` · `/mc komento`',
+        ].join('\n'))
+        .setFooter({ text: 'Tekijä: Mikael Riihimäki' });
+      return i.reply({ embeds: [e], ...EPH });
+    },
+
     async tiimi(i) {
       const sub = i.options.getSubcommand();
       if (sub === 'lista') {
@@ -224,6 +249,7 @@ export function commandHandler(ctx) {
   };
 
   return async function onInteraction(i) {
+    if (i.isChatInputCommand?.() && i.commandName === 'liftup') return handlers.liftup(i).catch(() => {});
     if (i.guildId !== ctx.config.guildId) return;
     try {
       if (i.isAutocomplete()) return await autocomplete(i);

@@ -1,11 +1,18 @@
 import { ActivityType, Client, Events, GatewayIntentBits } from 'discord.js';
-import { buildCommands, commandHandler } from './commands.js';
+import { buildCommands, buildGlobalCommands, commandHandler } from './commands.js';
 
 export async function registerCommands(ctx) {
   const guild = ctx.requireGuild();
   const cmds = await guild.commands.set(buildCommands());
-  ctx.log('info', `Slash-komennot rekisteröity (${cmds.size} kpl)`);
-  return cmds.size;
+  let global = 0;
+  try {
+    // Globaali /liftup: tästä tulee profiiliin "Supports Commands" (ja Active Developer -merkin edellytys).
+    global = (await ctx.client.application.commands.set(buildGlobalCommands())).size;
+  } catch (err) {
+    ctx.log('warn', `Globaalin /liftup-komennon rekisteröinti epäonnistui: ${err.message}`);
+  }
+  ctx.log('info', `Slash-komennot rekisteröity (${cmds.size} palvelimelle, ${global} globaali)`);
+  return cmds.size + global;
 }
 
 export function setPresence(ctx) {
