@@ -1,14 +1,16 @@
 {
   "name": "liftup-bot",
   "version": "1.0.0",
-  "description": "Liftup LAN Discord-botti",
+  "description": "Liftup LAN Discord-botti: tiimiroolit, ilmoitukset, Minecraft-integraatio, valvonta ja web-hallintapaneeli",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "check": "node --check src/index.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.28.1",

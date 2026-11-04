@@ -1,0 +1,163 @@
+{
+    "_comment": "Liftup LAN Discord-botti. Tuo: Admin → Nests/Eggs → Import Egg",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-11-04T12:00:00+02:00",
+    "name": "Liftup Bot",
+    "author": "admin@riilab.uk",
+    "description": "Liftup LANien Discord-botti: turnaustiimien roolit, ilmoitukset, Minecraft-integraatio, valvonta ja web-hallintapaneeli. Web-paneeli kuuntelee palvelimen pääallokaation porttia.",
+    "features": null,
+    "docker_images": {
+        "Node.js 22": "ghcr.io/parkervcp/yolks:nodejs_22",
+        "Node.js 20": "ghcr.io/parkervcp/yolks:nodejs_20"
+    },
+    "file_denylist": [],
+    "startup": "if [ -d .git ] && [ \"{{AUTO_UPDATE}}\" = \"1\" ]; then git fetch --depth 1 origin {{BRANCH}} && git reset --hard origin/{{BRANCH}}; fi; npm install --omit=dev --no-audit --no-fund; node src/index.js",
+    "config": {
+        "files": "{}",
+        "startup": "{\n    \"done\": \"Web-paneeli käynnissä\"\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Liftup-botti – asennus GitHubista\napt-get update -qq && apt-get install -y -qq git ca-certificates > /dev/null\nmkdir -p /mnt/server && cd /mnt/server\n\nif [ -z \"${GIT_ADDRESS}\" ]; then\n  echo \"VIRHE: GIT_ADDRESS puuttuu. Aseta GitHub-repon osoite muuttujiin ja tee Reinstall.\"\n  exit 1\nfi\n\nURL=\"${GIT_ADDRESS}\"\n[[ \"${URL}\" != *.git ]] && URL=\"${URL}.git\"\nif [ -n \"${GIT_TOKEN}\" ]; then\n  URL=$(echo \"${URL}\" | sed -e \"s#https://#https://${GIT_USERNAME:-git}:${GIT_TOKEN}@#\")\nfi\n\nif [ -d .git ]; then\n  echo \"Päivitetään olemassa oleva asennus…\"\n  git remote set-url origin \"${URL}\"\n  git fetch --depth 1 origin \"${BRANCH:-main}\" && git reset --hard \"origin/${BRANCH:-main}\"\nelse\n  # Säilytä data/ (tiimit, asetukset) uudelleenasennuksessa\n  [ -d data ] && mv data /tmp/liftup-data\n  find /mnt/server -mindepth 1 -maxdepth 1 -exec rm -rf {} +\n  git clone --depth 1 --branch \"${BRANCH:-main}\" \"${URL}\" /mnt/server || { echo \"VIRHE: kloonaus epäonnistui (väärä osoite, haara tai token?)\"; exit 1; }\n  [ -d /tmp/liftup-data ] && mv /tmp/liftup-data /mnt/server/data\nfi\n\nnpm install --omit=dev --no-audit --no-fund\nmkdir -p /mnt/server/data\necho \"Asennus valmis.\"\n",
+            "container": "node:22-bookworm-slim",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Discord-botin token",
+            "description": "Developer Portal → Bot → Reset Token",
+            "env_variable": "DISCORD_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Discord-palvelimen ID",
+            "description": "Palvelin, jota botti hallitsee",
+            "env_variable": "GUILD_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:25",
+            "field_type": "text"
+        },
+        {
+            "name": "Web-paneelin salasana (keksi itse)",
+            "description": "Tällä kirjaudut botin web-paneeliin selaimessa. Keksi itse, vähintään 10 merkkiä.",
+            "env_variable": "ADMIN_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|min:10|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "API-token (keksi itse, valinnainen)",
+            "description": "Vain turnausjärjestelmän integraatioon. Mikä tahansa pitkä satunnainen merkkijono. Tyhjä = pois päältä.",
+            "env_variable": "API_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Minecraft-osoite",
+            "description": "Minecraft-palvelimen IP/hostname (voi asettaa myös paneelista)",
+            "env_variable": "MC_HOST",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Minecraft RCON-portti",
+            "description": "server.properties: rcon.port",
+            "env_variable": "MC_RCON_PORT",
+            "default_value": "25575",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Minecraft RCON-salasana",
+            "description": "server.properties: rcon.password",
+            "env_variable": "MC_RCON_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Pterodactyl-paneelin URL",
+            "description": "Valinnainen: servereiden käynnistys/sammutus botin paneelista, esim. https://panel.riilab.uk",
+            "env_variable": "PTERO_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Pterodactyl Client API -avain",
+            "description": "Valinnainen: Account → API Credentials (ptlc_…)",
+            "env_variable": "PTERO_API_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub-repo",
+            "description": "Repon osoite, esim. https://github.com/kayttaja/liftup-bot",
+            "env_variable": "GIT_ADDRESS",
+            "default_value": "https://github.com/jauskiii/lanibot26.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:300",
+            "field_type": "text"
+        },
+        {
+            "name": "Git-haara",
+            "description": "",
+            "env_variable": "BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub-token (vain yksityinen repo)",
+            "description": "Tarvitaan vain jos repo muutetaan yksityiseksi. Fine-grained token, Contents: Read-only.",
+            "env_variable": "GIT_TOKEN",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": true,
+            "rules": "nullable|string|max:200",
+            "field_type": "text"
+        },
+        {
+            "name": "Päivitä GitHubista käynnistyksessä",
+            "description": "1 = hakee uusimman version joka käynnistyksellä, 0 = vain Reinstallilla",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        }
+    ]
+}

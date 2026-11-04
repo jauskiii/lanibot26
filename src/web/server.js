@@ -19,7 +19,7 @@ const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => obj[k] !== und
 
 export function startWeb(ctx) {
   const app = express();
-  const { teams, announce, minecraft, moderation, ptero } = ctx.services;
+  const { teams, announce, minecraft, moderation, ptero, roles } = ctx.services;
   const sessions = new Map(); // token -> expiresAt
   const loginAttempts = new Map(); // ip -> { count, until }
 
@@ -114,6 +114,10 @@ export function startWeb(ctx) {
         .filter((c) => [ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(c.type))
         .sort((a, b) => a.rawPosition - b.rawPosition)
         .map((c) => ({ id: c.id, name: c.name, parent: c.parent?.name ?? '' })),
+      categories: [...g.channels.cache.values()]
+        .filter((c) => c.type === ChannelType.GuildCategory)
+        .sort((a, b) => a.rawPosition - b.rawPosition)
+        .map((c) => ({ id: c.id, name: c.name })),
       members: [...g.members.cache.values()].filter((m) => !m.user.bot)
         .map((m) => ({ id: m.id, name: m.displayName, username: m.user.username, avatar: m.displayAvatarURL({ size: 64 }) }))
         .sort((a, b) => a.name.localeCompare(b.name, 'fi')),
@@ -191,7 +195,7 @@ export function startWeb(ctx) {
   }));
 
   // ---------- Ilmoitukset ----------
-  const ANNOUNCE_KEYS = ['channelId', 'title', 'body', 'color', 'mention', 'serverIds', 'pin', 'image', 'sendAt'];
+  const ANNOUNCE_KEYS = ['channelId', 'channelIds', 'title', 'body', 'color', 'mention', 'serverIds', 'pin', 'image', 'sendAt'];
   app.get('/api/announcements', wrap(() => ctx.store.data.announcements));
   app.post('/api/announcements', wrap((req) => {
     const input = pick(req.body || {}, ANNOUNCE_KEYS);
@@ -200,6 +204,16 @@ export function startWeb(ctx) {
     return input.sendAt ? announce.schedule(input) : announce.send(input);
   }));
   app.delete('/api/announcements/:id', wrap((req) => announce.cancel(req.params.id)));
+
+  // ---------- Roolit: paneelit ja jäsenet ----------
+  app.post('/api/roles', wrap((req) => roles.createRole(req.body || {})));
+  app.get('/api/role-panels', wrap(() => roles.listPanels()));
+  app.post('/api/role-panels', wrap((req) => roles.createPanel(req.body || {})));
+  app.put('/api/role-panels/:id', wrap((req) => roles.updatePanel(req.params.id, req.body || {})));
+  app.delete('/api/role-panels/:id', wrap((req) => roles.deletePanel(req.params.id)));
+  app.get('/api/members/:id', wrap((req) => roles.memberInfo(req.params.id)));
+  app.post('/api/roles/:roleId/members', wrap((req) => roles.giveRole(req.params.roleId, req.body?.users ?? req.body?.bulk ?? [])));
+  app.delete('/api/roles/:roleId/members/:userId', wrap((req) => roles.takeRole(req.params.userId, req.params.roleId)));
 
   // ---------- Minecraft ----------
   const MC_KEYS = ['host', 'port', 'rconPort', 'rconPassword', 'statusEnabled', 'statusChannelId', 'allowSelfWhitelist'];

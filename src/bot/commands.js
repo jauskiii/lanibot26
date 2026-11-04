@@ -80,7 +80,7 @@ export function buildCommands() {
 }
 
 export function commandHandler(ctx) {
-  const { teams, announce, minecraft, moderation } = ctx.services;
+  const { teams, announce, minecraft, moderation, roles } = ctx.services;
 
   async function autocomplete(i) {
     const focused = i.options.getFocused(true);
@@ -227,11 +227,12 @@ export function commandHandler(ctx) {
     if (i.guildId !== ctx.config.guildId) return;
     try {
       if (i.isAutocomplete()) return await autocomplete(i);
+      if (i.isButton() && roles.isPanelButton(i.customId)) return await roles.onButton(i);
       if (!i.isChatInputCommand()) return;
       const h = handlers[i.commandName];
       if (h) await h(i);
     } catch (err) {
-      ctx.log('error', `Komento /${i.commandName} epäonnistui: ${err.message}`);
+      ctx.log('error', `${i.isButton?.() ? `Nappi ${i.customId}` : `Komento /${i.commandName}`} epäonnistui: ${err.message}`);
       const msg = `❌ ${err.message}`;
       if (i.deferred || i.replied) await i.editReply(msg).catch(() => {});
       else if (i.isRepliable()) await i.reply({ content: msg, ...EPH }).catch(() => {});

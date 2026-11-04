@@ -295,6 +295,176 @@ const teamCard = (t) => `
     <button class="btn ghost small" data-a="bulk" style="justify-self:start">+ Lisää useita kerralla</button>
   </div>`;
 
+// ---- Roolit: paneelit + jäsenten roolit ----
+const STYLE_LABELS = { grey: 'Harmaa', blue: 'Sininen', green: 'Vihreä', red: 'Punainen' };
+
+views.roolit = async (editId) => {
+  await Promise.all([refreshStatus(), loadGuild(true)]);
+  const panels = await api('GET', '/role-panels').catch(() => []);
+  const editing = panels.find((p) => p.id === editId);
+  const assignableRoles = guild.roles.filter((r) => !r.managed && r.position < guild.botTopRole);
+  const assignableOptions = (sel) => `<option value="">— rooli —</option>` +
+    assignableRoles.map((r) => `<option value="${r.id}" ${r.id === sel ? 'selected' : ''}>@${esc(r.name)}</option>`).join('');
+  let opts = editing ? editing.options.map((o) => ({ ...o })) : [{ roleId: '', label: '', emoji: '', style: 'grey' }];
+
+  view.innerHTML = `
+    <h1>Roolit</h1>
+    <p class="sub">Roolipaneeli = viesti, jonka napeista jäsenet ottavat itselleen roolin (esim. CS2, Minecraft, Bingo, Tetris) ja pääsevät sen kanaville. Alempana voit jakaa rooleja käsin.</p>
+    ${offlineBanner()}
+    ${guild.roles.length && assignableRoles.length < guild.roles.filter((r) => !r.managed).length
+      ? '<div class="banner warn">Osa rooleista on botin roolin yläpuolella, eikä botti voi jakaa niitä. Siirrä botin rooli ylemmäs Discordin roolilistassa, jos tarvitset niitä.</div>' : ''}
+    <div class="grid cols-2">
+      <form id="panel" class="card stack">
+        <div class="row between"><h2 style="margin:0">${editing ? 'Muokkaa roolipaneelia' : 'Uusi roolipaneeli'}</h2>
+          <button type="button" class="btn small" data-a="newrole">+ Luo uusi rooli</button></div>
+        <div class="form-grid">
+          <label>Kanava<select name="channelId" required>${channelOptions(editing?.channelId, '— valitse kanava —')}</select></label>
+          <label>Valinta<select name="mode"><option value="toggle" ${editing?.mode !== 'single' ? 'selected' : ''}>Useita rooleja</option><option value="single" ${editing?.mode === 'single' ? 'selected' : ''}>Vain yksi kerrallaan</option></select></label>
+        </div>
+        <label>Otsikko<input name="title" value="${esc(editing?.title ?? 'Mitä pelaat LANeilla? 🎮')}" maxlength="256"></label>
+        <label>Teksti<textarea name="body" style="min-height:70px">${esc(editing?.body ?? 'Valitse pelit, niin näet niiden ilmoituskanavat.')}</textarea></label>
+        <label>Väri<input type="color" name="color" value="${esc(editing?.color ?? '#5865f2')}"></label>
+        <div class="stack" style="gap:8px">
+          <span class="muted small" style="font-weight:500">Napit (max 25)</span>
+          <div id="opts" class="stack" style="gap:8px"></div>
+          <div><button type="button" class="btn small ghost" data-a="addopt">+ Lisää nappi</button></div>
+        </div>
+        <div class="row"><button class="btn primary">${editing ? 'Tallenna ja päivitä viesti' : 'Julkaise paneeli'}</button>
+          ${editing ? '<button type="button" class="btn ghost" data-a="cancel">Peruuta</button>' : ''}</div>
+      </form>
+      <div class="stack">
+        <div class="card"><h2>Julkaistut paneelit</h2>
+          ${panels.length ? panels.map((p) => `<div class="stack" style="gap:6px;padding:10px 0;border-bottom:1px solid var(--line)">
+              <div class="row between"><div><b>${esc(p.title)}</b><div class="muted small">#${esc(p.channelName || '?')} · ${p.mode === 'single' ? 'vain yksi' : 'useita'}</div></div>
+                <div class="row" style="gap:4px">${p.url ? `<a class="btn small ghost" href="${esc(p.url)}" target="_blank" rel="noopener">Avaa</a>` : ''}
+                  <button class="btn small" data-edit="${p.id}">Muokkaa</button><button class="btn small danger" data-delpanel="${p.id}">✕</button></div></div>
+              <div class="chips">${p.options.map((o) => `<span class="chip" style="padding:3px 10px">${esc(o.emoji)} ${esc(o.label)} <span class="muted small">· ${o.missing ? 'rooli poistettu!' : `${o.members} jäsentä`}</span></span>`).join('')}</div>
+            </div>`).join('') : '<p class="empty">Ei vielä roolipaneeleita.</p>'}
+        </div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:32px">Jäsenten roolit</h2>
+    ${memberDatalist()}
+    <div class="grid cols-2">
+      <div class="card stack">
+        <form id="msearch" class="row" style="flex-wrap:nowrap"><input name="user" list="members" placeholder="Hae jäsen…" required><button class="btn">Näytä</button></form>
+        <div id="minfo"><p class="empty">Hae jäsen nähdäksesi ja muokataksesi hänen roolejaan.</p></div>
+      </div>
+      <form id="bulkrole" class="card stack">
+        <h2 style="margin:0">Anna rooli usealle kerralla</h2>
+        <label>Rooli<select name="roleId" required>${assignableOptions('')}</select></label>
+        <label>Jäsenet (yksi per rivi tai pilkuilla: käyttäjänimi, näyttönimi, @mention tai ID)<textarea name="bulk" required></textarea></label>
+        <div><button class="btn primary">Anna rooli</button></div>
+      </form>
+    </div>`;
+
+  // --- napit-editori ---
+  const optsEl = $('#opts');
+  const syncOpts = () => $$('[data-opt]', optsEl).forEach((row) => {
+    const o = opts[Number(row.dataset.opt)];
+    o.roleId = row.querySelector('[data-f=roleId]').value;
+    o.label = row.querySelector('[data-f=label]').value;
+    o.emoji = row.querySelector('[data-f=emoji]').value;
+    o.style = row.querySelector('[data-f=style]').value;
+  });
+  const renderOpts = () => {
+    optsEl.innerHTML = opts.map((o, idx) => `
+      <div class="row" data-opt="${idx}" style="flex-wrap:nowrap;gap:6px">
+        <select data-f="roleId" style="flex:2;min-width:0">${assignableOptions(o.roleId)}</select>
+        <input data-f="label" value="${esc(o.label)}" placeholder="Napin teksti" style="flex:2;min-width:0">
+        <input data-f="emoji" value="${esc(o.emoji)}" placeholder="🎮" style="width:56px;flex:none">
+        <select data-f="style" style="width:auto;flex:none">${Object.entries(STYLE_LABELS).map(([k, v]) => `<option value="${k}" ${o.style === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <button type="button" class="icon-btn" data-rmopt="${idx}" title="Poista">✕</button>
+      </div>`).join('');
+  };
+  renderOpts();
+  optsEl.onchange = (e) => {
+    // Täytä napin teksti roolin nimellä, jos tyhjä
+    if (e.target.dataset.f === 'roleId') {
+      const label = e.target.closest('[data-opt]').querySelector('[data-f=label]');
+      if (!label.value) label.value = guild.roles.find((r) => r.id === e.target.value)?.name ?? '';
+    }
+  };
+
+  $('#panel').onsubmit = async (e) => {
+    e.preventDefault();
+    syncOpts();
+    const d = formData(e.target);
+    const body = { channelId: d.channelId, mode: d.mode, title: d.title, body: d.body, color: d.color, options: opts.filter((o) => o.roleId) };
+    const r = await act(e.submitter, () => (editing ? api('PUT', `/role-panels/${editing.id}`, body) : api('POST', '/role-panels', body)), editing ? 'Paneeli päivitetty' : 'Paneeli julkaistu');
+    if (r) views.roolit();
+  };
+
+  // --- jäsenen roolit ---
+  let currentMember = null;
+  const showMember = async (userId) => {
+    const m = await api('GET', `/members/${userId}`).catch((err) => { toast(err.message, true); return null; });
+    if (!m) return;
+    currentMember = m;
+    const has = new Set(m.roles.map((r) => r.id));
+    $('#minfo').innerHTML = `
+      <div class="row"><img src="${esc(m.avatar)}" alt="" style="width:44px;height:44px;border-radius:50%"><div><b>${esc(m.name)}</b><div class="muted small">@${esc(m.username)}</div></div></div>
+      <div class="chips" style="margin:12px 0">${m.roles.map((r) => `<span class="chip" style="padding:3px 4px 3px 10px;border-color:${r.color === '#000000' ? 'var(--line)' : esc(r.color)}"><span>@${esc(r.name)}</span>${r.editable ? `<button class="icon-btn" data-take="${r.id}" title="Poista rooli">✕</button>` : ''}</span>`).join('') || '<span class="empty">Ei rooleja</span>'}</div>
+      <div class="row" style="flex-wrap:nowrap"><select id="give-sel">${'<option value="">+ lisää rooli…</option>' + assignableRoles.filter((r) => !has.has(r.id)).map((r) => `<option value="${r.id}">@${esc(r.name)}</option>`).join('')}</select><button class="btn" id="give-btn">Lisää</button></div>`;
+  };
+  $('#msearch').onsubmit = (e) => { e.preventDefault(); showMember(memberIdFromLabel(formData(e.target).user.trim())); };
+
+  $('#bulkrole').onsubmit = async (e) => {
+    e.preventDefault();
+    const d = formData(e.target);
+    const r = await act(e.submitter, () => api('POST', `/roles/${d.roleId}/members`, { bulk: d.bulk }));
+    if (!r) return;
+    toast(`@${r.role}: annettu ${r.added.length} jäsenelle${r.failed.length ? ` · epäonnistui: ${r.failed.map((f) => `${f.user} (${f.reason})`).join(', ')}` : ''}`, r.failed.length > 0);
+    if (!r.failed.length) e.target.elements.bulk.value = '';
+  };
+
+  view.onclick = async (e) => {
+    const b = e.target.closest('button,[data-edit]');
+    if (!b) return;
+    if (b.dataset.a === 'addopt') { syncOpts(); if (opts.length < 25) opts.push({ roleId: '', label: '', emoji: '', style: 'grey' }); return renderOpts(); }
+    if (b.dataset.rmopt !== undefined) { syncOpts(); opts.splice(Number(b.dataset.rmopt), 1); if (!opts.length) opts.push({ roleId: '', label: '', emoji: '', style: 'grey' }); return renderOpts(); }
+    if (b.dataset.a === 'cancel') return views.roolit();
+    if (b.dataset.edit) return views.roolit(b.dataset.edit);
+    if (b.dataset.delpanel) {
+      if (!(await confirmModal('Poistetaanko roolipaneeli ja sen viesti Discordista? Roolit jäävät jäsenille.', 'Poista'))) return;
+      await act(b, () => api('DELETE', `/role-panels/${b.dataset.delpanel}`), 'Paneeli poistettu');
+      return views.roolit();
+    }
+    if (b.dataset.a === 'newrole') {
+      return modal(`<h2>Uusi rooli</h2>
+        <label>Nimi<input name="name" required placeholder="esim. CS2, Minecraft, Bingo"></label>
+        <label>Väri<input type="color" name="color" value="#5ec8ff"></label>
+        <label class="check"><input type="checkbox" name="createChannel" checked> Luo roolille oma tekstikanava (näkyy vain roolin saaneille)</label>
+        <label>Kanavan kategoria<select name="channelCategoryId"><option value="">— ei kategoriaa —</option>${(guild.categories || []).map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label>
+        <div class="row"><button class="btn primary">Luo</button><button class="btn ghost" value="cancel">Peruuta</button></div>`,
+        async (d, btn) => {
+          syncOpts();
+          const r = await act(btn, () => api('POST', '/roles', d), (x) => `Rooli @${x.name} luotu${x.channelName ? ` + #${x.channelName}` : ''}`);
+          if (!r) return false;
+          await loadGuild(true);
+          assignableRoles.unshift({ id: r.id, name: r.name });
+          const empty = opts.find((o) => !o.roleId);
+          if (empty) Object.assign(empty, { roleId: r.id, label: r.name });
+          else opts.push({ roleId: r.id, label: r.name, emoji: '', style: 'grey' });
+          renderOpts();
+        });
+    }
+    if (b.dataset.take && currentMember) {
+      await act(b, () => api('DELETE', `/roles/${b.dataset.take}/members/${currentMember.id}`), 'Rooli poistettu');
+      return showMember(currentMember.id);
+    }
+    if (b.id === 'give-btn' && currentMember) {
+      const roleId = $('#give-sel').value;
+      if (!roleId) return;
+      const r = await act(b, () => api('POST', `/roles/${roleId}/members`, { users: [currentMember.id] }));
+      if (r?.failed.length) toast(r.failed[0].reason, true);
+      else if (r) toast(`@${r.role} lisätty`);
+      return showMember(currentMember.id);
+    }
+  };
+};
+
 // ---- Ilmoitukset ----
 const PRESETS = {
   turnaus: { title: '🏆 Turnaus alkaa!', body: 'CS2-turnaus alkaa 15 minuutin päästä. Tiimit, kokoontukaa omille puhekanaville!', color: '#f1c40f', mention: 'everyone' },
@@ -305,7 +475,10 @@ const PRESETS = {
 
 views.ilmoitukset = async () => {
   await Promise.all([refreshStatus(), loadGuild(true)]);
-  const [servers, settings, ann] = await Promise.all([api('GET', '/servers'), api('GET', '/settings'), api('GET', '/announcements')]);
+  const [servers, settings, ann, teams] = await Promise.all([api('GET', '/servers'), api('GET', '/settings'), api('GET', '/announcements'), api('GET', '/teams')]);
+  const teamCh = teams.filter((t) => t.textChannelId);
+  const chName = (id) => guild.channels.find((c) => c.id === id)?.name ?? id;
+  const selected = new Set(settings.announceChannelId ? [settings.announceChannelId] : []);
   view.innerHTML = `
     <h1>Ilmoitukset</h1>
     <p class="sub">Lähetä ilmoitus botin nimissä – esim. serverien IP:t, turnauksen alku tai ruokatauko. Voit myös ajastaa.</p>
@@ -315,10 +488,15 @@ views.ilmoitukset = async () => {
         <div class="row"><span class="muted small">Pohjat:</span>
           ${Object.entries({ turnaus: 'Turnaus alkaa', serverit: 'Serverit auki', ottelu: 'Ottelu', tauko: 'Ruokatauko' }).map(([k, v]) => `<button type="button" class="btn small ghost" data-preset="${k}">${v}</button>`).join('')}
         </div>
-        <div class="form-grid">
-          <label>Kanava<select name="channelId" required>${channelOptions(settings.announceChannelId, '— valitse kanava —')}</select></label>
-          <label>Pingaus<select name="mention"><option value="none">Ei pingiä</option><option value="here">@here</option><option value="everyone">@everyone</option>${guild.roles.filter((r) => !r.managed).map((r) => `<option value="${r.id}">@${esc(r.name)}</option>`).join('')}</select></label>
+        <div class="stack" style="gap:8px">
+          <span class="muted small" style="font-weight:500">Kanavat (yksi tai useampi)</span>
+          <div class="chips" id="chan-chips"></div>
+          <select id="chan-add" aria-label="Lisää kanava">${channelOptions('', '+ lisää kanava…')}</select>
+          ${teamCh.length ? `<div class="row" style="gap:6px"><span class="muted small">Tiimikanavat:</span>
+            ${teamCh.map((t) => `<button type="button" class="btn small" data-teamch="${t.textChannelId}" style="border-color:${esc(t.color)}">${esc(t.name)}</button>`).join('')}
+            <button type="button" class="btn small ghost" data-allteams="1">Kaikki tiimit</button></div>` : ''}
         </div>
+        <label>Pingaus<select name="mention"><option value="none">Ei pingiä</option>${teamCh.length ? '<option value="team">Kanavan tiimi (pingaa kunkin tiimin roolia sen omalla kanavalla)</option>' : ''}<option value="here">@here</option><option value="everyone">@everyone</option>${guild.roles.filter((r) => !r.managed).map((r) => `<option value="${r.id}">@${esc(r.name)}</option>`).join('')}</select></label>
         <label>Otsikko<input name="title" maxlength="256"></label>
         <label>Teksti (Discord-markdown toimii)<textarea name="body" maxlength="4000"></textarea></label>
         ${servers.length ? `<fieldset class="card" style="background:var(--bg);padding:12px"><legend class="muted small">Liitä serverien osoitteet</legend><div class="row">${servers.map((s) => `<label class="check"><input type="checkbox" name="serverIds" value="${s.id}" data-multi="1"> ${esc(s.name)}</label>`).join('')}</div></fieldset>` : '<p class="muted small">Lisää pelipalvelimia Serverit-sivulla, niin voit liittää IP:t ilmoitukseen yhdellä klikkauksella.</p>'}
@@ -342,9 +520,16 @@ views.ilmoitukset = async () => {
     </div>`;
 
   const form = $('#ann');
+  const renderChips = () => {
+    $('#chan-chips').innerHTML = [...selected].map((id) => `<span class="chip" style="padding:3px 4px 3px 10px"><span>#${esc(chName(id))}</span><button type="button" class="icon-btn" data-rmch="${id}" title="Poista">✕</button></span>`).join('')
+      || '<span class="empty">Ei kanavia valittuna</span>';
+    $$('[data-teamch]').forEach((b) => b.classList.toggle('primary', selected.has(b.dataset.teamch)));
+    $('#send-btn').textContent = `${form.elements.sendAt.value ? 'Ajasta' : 'Lähetä nyt'}${selected.size > 1 ? ` (${selected.size} kanavaa)` : ''}`;
+  };
+  $('#chan-add').onchange = (e) => { if (e.target.value) selected.add(e.target.value); e.target.value = ''; renderChips(); };
   const renderPreview = () => {
     const d = formData(form);
-    const mention = d.mention === 'none' ? '' : d.mention === 'here' || d.mention === 'everyone' ? `@${d.mention}` : `@${guild.roles.find((r) => r.id === d.mention)?.name ?? ''}`;
+    const mention = d.mention === 'none' ? '' : d.mention === 'team' ? '@tiimin rooli' : d.mention === 'here' || d.mention === 'everyone' ? `@${d.mention}` : `@${guild.roles.find((r) => r.id === d.mention)?.name ?? ''}`;
     const sel = servers.filter((s) => (d.serverIds || []).includes(s.id));
     $('#preview').innerHTML = `${mention ? `<div style="margin-bottom:6px"><span class="mention">${esc(mention)}</span></div>` : ''}
       <div class="embed" style="--embed:${esc(d.color)}">
@@ -353,12 +538,21 @@ views.ilmoitukset = async () => {
         ${sel.map((s) => `<div class="ef"><b>${esc(s.name)}</b><code>${esc(s.port ? `${s.address}:${s.port}` : s.address)}</code>${s.password ? ` · salasana <code>${esc(s.password)}</code>` : ''}${s.note ? `<div>${esc(s.note)}</div>` : ''}</div>`).join('')}
         <div class="foot">Liftup LAN</div>
       </div>`;
-    $('#send-btn').textContent = d.sendAt ? 'Ajasta' : 'Lähetä nyt';
+    renderChips();
   };
   form.oninput = renderPreview;
   renderPreview();
 
   view.onclick = async (e) => {
+    const rm = e.target.closest('[data-rmch]');
+    if (rm) { selected.delete(rm.dataset.rmch); return renderChips(); }
+    const tc = e.target.closest('[data-teamch]');
+    if (tc) { selected.has(tc.dataset.teamch) ? selected.delete(tc.dataset.teamch) : selected.add(tc.dataset.teamch); return renderChips(); }
+    if (e.target.closest('[data-allteams]')) {
+      const all = teamCh.every((t) => selected.has(t.textChannelId));
+      teamCh.forEach((t) => (all ? selected.delete(t.textChannelId) : selected.add(t.textChannelId)));
+      return renderChips();
+    }
     const p = e.target.closest('[data-preset]');
     if (p) {
       const v = PRESETS[p.dataset.preset];
@@ -374,11 +568,16 @@ views.ilmoitukset = async () => {
     e.preventDefault();
     const d = formData(form);
     d.serverIds ||= [];
+    d.channelIds = [...selected];
+    if (!d.channelIds.length) return toast('Valitse vähintään yksi kanava', true);
     if (d.sendAt) d.sendAt = new Date(d.sendAt).toISOString();
     else delete d.sendAt;
     if (!d.image) delete d.image;
-    const r = await act(e.submitter, () => api('POST', '/announcements', d), d.sendAt ? 'Ilmoitus ajastettu' : 'Ilmoitus lähetetty');
-    if (r) views.ilmoitukset();
+    const r = await act(e.submitter, () => api('POST', '/announcements', d));
+    if (!r) return;
+    if (r.failed?.length) toast(`Lähetetty ${r.messages.length} kanavalle, epäonnistui: ${r.failed.map((f) => `#${f.channelName || f.channelId} (${f.reason})`).join(', ')}`, true);
+    else toast(d.sendAt ? `Ilmoitus ajastettu (${d.channelIds.length} kanavaa)` : `Ilmoitus lähetetty ${r.messages?.length ?? 1} kanavalle`);
+    views.ilmoitukset();
   };
 };
 

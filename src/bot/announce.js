@@ -39,39 +39,66 @@ export function announceService(ctx) {
     return { content: `<@&${mention}>`, allowedMentions: { roles: [mention] } };
   }
 
+  /** Kanavat: channelIds-lista (uusi) tai yksittäinen channelId (vanha/API), muuten oletuskanava. */
+  function resolveChannelIds(input) {
+    const ids = [...new Set([...(Array.isArray(input.channelIds) ? input.channelIds : []), input.channelId].filter(Boolean))];
+    if (!ids.length && data().settings.announceChannelId) ids.push(data().settings.announceChannelId);
+    if (!ids.length) throw new HttpError(400, 'Valitse vähintään yksi kanava (tai aseta oletuskanava asetuksista)');
+    if (ids.length > 25) throw new HttpError(400, 'Enintään 25 kanavaa kerralla');
+    return ids;
+  }
+
   async function send(input) {
     const guild = ctx.requireGuild();
-    const channelId = input.channelId || data().settings.announceChannelId;
-    if (!channelId) throw new HttpError(400, 'Valitse kanava (tai aseta oletuskanava asetuksista)');
+    const channelIds = resolveChannelIds(input);
     if (!input.title && !input.body && !(input.serverIds || []).length) throw new HttpError(400, 'Ilmoitus on tyhjä');
-    const channel = guild.channels.cache.get(channelId) ?? (await guild.channels.fetch(channelId).catch(() => null));
-    if (!channel?.isTextBased()) throw new HttpError(400, 'Kanavaa ei löytynyt tai se ei ole tekstikanava');
 
-    const { content, allowedMentions } = mentionContent(input.mention);
-    const msg = await channel.send({ content, embeds: [buildEmbed(input)], allowedMentions });
-    if (input.pin) await msg.pin().catch(() => {});
+    const embed = buildEmbed(input);
+    // "team" = pingaa kullakin tiimikanavalla sen tiimin roolia
+    const mentionFor = (channelId) => {
+      if (input.mention !== 'team') return mentionContent(input.mention);
+      const team = data().teams.find((t) => t.textChannelId === channelId);
+      return team?.roleId ? mentionContent(team.roleId) : mentionContent('none');
+    };
+    const sent = [];
+    const failed = [];
+    for (const channelId of channelIds) {
+      const channel = guild.channels.cache.get(channelId) ?? (await guild.channels.fetch(channelId).catch(() => null));
+      if (!channel?.isTextBased()) { failed.push({ channelId, reason: 'Kanavaa ei löytynyt tai se ei ole tekstikanava' }); continue; }
+      try {
+        const { content, allowedMentions } = mentionFor(channelId);
+        const msg = await channel.send({ content, embeds: [embed], allowedMentions });
+        if (input.pin) await msg.pin().catch(() => {});
+        sent.push({ channelId, channelName: channel.name, messageId: msg.id, url: msg.url });
+      } catch (err) {
+        failed.push({ channelId, channelName: channel.name, reason: err.code === 50013 ? 'Botilta puuttuu oikeus kirjoittaa kanavalle' : err.message });
+      }
+    }
+    if (!sent.length) throw new HttpError(400, `Ilmoitusta ei voitu lähettää: ${failed.map((f) => `${f.channelName ? `#${f.channelName}` : f.channelId}: ${f.reason}`).join('; ')}`);
 
     const record = {
       id: newId(),
       title: input.title || '',
-      channelId,
-      channelName: channel.name,
-      messageId: msg.id,
-      url: msg.url,
+      channelName: sent.map((s) => s.channelName).join(', '),
+      url: sent[0].url,
+      messages: sent,
       sentAt: new Date().toISOString(),
       by: input.by || 'web',
     };
     data().announcements.history.unshift(record);
     data().announcements.history.length = Math.min(data().announcements.history.length, 50);
     ctx.store.save();
-    ctx.log('info', `Ilmoitus lähetetty #${channel.name}: ${record.title || '(ei otsikkoa)'}`);
-    return record;
+    ctx.log('info', `Ilmoitus lähetetty ${sent.map((s) => `#${s.channelName}`).join(', ')}: ${record.title || '(ei otsikkoa)'}`);
+    for (const f of failed) ctx.log('warn', `Ilmoitus epäonnistui ${f.channelName ? `#${f.channelName}` : f.channelId}: ${f.reason}`);
+    return { ...record, failed };
   }
 
   function schedule(input) {
     const at = new Date(input.sendAt);
     if (Number.isNaN(at.getTime())) throw new HttpError(400, 'Virheellinen ajankohta');
     if (at.getTime() < Date.now() - 60_000) throw new HttpError(400, 'Ajankohta on menneisyydessä');
+    input.channelIds = resolveChannelIds(input);
+    delete input.channelId;
     const item = { ...input, id: newId(), sendAt: at.toISOString(), createdAt: new Date().toISOString() };
     data().announcements.scheduled.push(item);
     data().announcements.scheduled.sort((a, b) => a.sendAt.localeCompare(b.sendAt));

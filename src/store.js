@@ -22,6 +22,7 @@ const defaults = () => ({
   teams: [],
   servers: [],
   announcements: { scheduled: [], history: [] },
+  rolePanels: [],
   moderation: {
     enabled: true,
     bannedWords: [],

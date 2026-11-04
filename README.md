@@ -11,7 +11,8 @@ Discord-botti Liftup LANeille: turnaustiimien roolit automaattisesti, ilmoitukse
 | Osa | Mitä tekee |
 |---|---|
 | **Tiimit** | Luo esim. *Tiimi 1–4* yhdellä klikkauksella (roolit + halutessa omat teksti/puhekanavat). Jäsenet lisätään hakemalla nimellä, massalisäyksenä (lista nimiä/ID:itä) tai JSON-tuonnilla. Jäsen voi kuulua vain yhteen tiimiin: siirto poistaa vanhan roolin automaattisesti. Lopuksi *Tyhjennä kaikki* tai *Poista kaikki*. |
-| **Ilmoitukset** | Embed-ilmoitukset botin nimissä, valitut serverit liitetään mukaan (IP, portti, salasana). Pingaus (@here/@everyone/rooli), kiinnitys, ajastus, valmiit pohjat ja esikatselu. |
+| **Ilmoitukset** | Embed-ilmoitukset botin nimissä **yhdelle tai usealle kanavalle kerralla** (pikanapit tiimikanaville, esim. map ban -linkki molemmille tiimeille). Valitut serverit liitetään mukaan (IP, portti, salasana). Pingaus (@here/@everyone/rooli tai *kanavan tiimi*), kiinnitys, ajastus, valmiit pohjat ja esikatselu. |
+| **Roolit** | **Roolipaneelit:** viesti, jonka napeista jäsenet ottavat/poistavat itselleen roolin (esim. CS2, Minecraft, Bingo, Tetris) – tila "useita" tai "vain yksi". Uuden roolin voi luoda suoraan paneelista, halutessa oman kanavan kanssa (näkyy vain roolin saaneille). **Jäsenten roolit:** hae jäsen ja lisää/poista rooleja, tai anna rooli monelle kerralla. Botti ei koskaan jaa omaa rooliaan korkeampia tai integraatioiden rooleja. |
 | **Serverit** | CS2-, Minecraft- ym. serverien osoitteet. Komennot `/serverit` ja `/ip`, sekä kanavalla pysyvä serverilista, joka päivittyy itsestään. Valinnaisesti Pterodactyl-virtanapit (käynnistä/uudelleenkäynnistä/sammuta). |
 | **Minecraft** | Tilan seuranta (online, pelaajat), automaattisesti päivittyvä tilaviesti, `/mc whitelist` pelaajille, RCON-konsoli paneelissa ja `/mc komento` ylläpidolle. |
 | **Valvonta** | Automod (kielletyt sanat, kutsulinkit, linkit, spämmi → hiljennys), varoitukset (automaattinen hiljennys N:nnestä), modiloki-kanava, tervetuloviesti ja automaattinen rooli. |
@@ -103,7 +104,7 @@ curl -X POST http://botti:8080/api/announcements \
 
 Jäsenet tunnistetaan Discord-ID:llä, käyttäjänimellä, näyttönimellä tai `<@mention>`-muodolla. Vastaus kertoo, ketä ei löytynyt.
 
-Muut: `GET /api/teams`, `POST /api/teams/generate {count,prefix}`, `POST /api/teams/:id/members {users:[…]}`, `DELETE /api/teams/:id/members/:userId`, `POST /api/teams/reset`, `GET|POST|PUT|DELETE /api/servers`, `GET /api/status`.
+Muut: `GET /api/teams`, `POST /api/teams/generate {count,prefix}`, `POST /api/teams/:id/members {users:[…]}`, `DELETE /api/teams/:id/members/:userId`, `POST /api/teams/reset`, `GET|POST|PUT|DELETE /api/servers`, `GET /api/status`, `POST /api/roles/:roleId/members {users:[…]}`, `GET|POST|PUT|DELETE /api/role-panels`. Ilmoitukselle useampi kanava: `"channelIds": ["…","…"]`, ja `"mention": "team"` pingaa tiimikanavilla kunkin tiimin roolia.
 
 ## Tietoturva
 
