@@ -178,9 +178,36 @@ export function commandHandler(ctx) {
 
     async siivoa(i) {
       await i.deferReply(EPH);
-      const deleted = await i.channel.bulkDelete(i.options.getInteger('määrä', true), true);
-      ctx.log('info', `Siivous #${i.channel.name}: ${deleted.size} viestiä (${i.user.tag})`);
-      return i.editReply(`🧹 Poistettu ${deleted.size} viestiä.`);
+      const amount = i.options.getInteger('määrä', true);
+      const need = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages];
+      const missing = i.channel.permissionsFor(i.guild.members.me)?.missing(need) ?? need;
+      if (missing.length) return i.editReply(`❌ Botilta puuttuu tällä kanavalla oikeus: ${missing.join(', ')}`);
+
+      const fetched = await i.channel.messages.fetch({ limit: amount });
+      const targets = fetched.filter((m) => !m.pinned); // kiinnitetyt (esim. serverilista) jätetään
+      const skippedPinned = fetched.size - targets.size;
+
+      // Discordin massapoisto toimii vain alle 14 pv vanhoille viesteille – vanhemmat poistetaan yksitellen.
+      const cutoff = Date.now() - 14 * 24 * 3600 * 1000 + 5 * 60 * 1000;
+      const recent = targets.filter((m) => m.createdTimestamp > cutoff);
+      const old = targets.filter((m) => m.createdTimestamp <= cutoff);
+
+      let deleted = 0;
+      let failed = 0;
+      if (recent.size) deleted += (await i.channel.bulkDelete(recent, true)).size;
+      if (old.size) {
+        await i.editReply(`🧹 Poistetaan ${old.size} yli 14 pv vanhaa viestiä yksitellen, hetki…`);
+        for (const m of old.values()) {
+          try { await m.delete(); deleted++; } catch { failed++; }
+        }
+      }
+
+      ctx.log('info', `Siivous #${i.channel.name}: ${deleted} viestiä (${i.user.tag})`);
+      const extra = [
+        skippedPinned ? `${skippedPinned} kiinnitettyä jätettiin` : '',
+        failed ? `${failed} epäonnistui` : '',
+      ].filter(Boolean).join(', ');
+      return i.editReply(`🧹 Poistettu ${deleted} viestiä.${extra ? ` (${extra})` : ''}`);
     },
 
     async ilmoita(i) {
