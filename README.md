@@ -106,7 +106,9 @@ Jäsenet tunnistetaan Discord-ID:llä, käyttäjänimellä, näyttönimellä tai
 
 Muut: `GET /api/teams`, `POST /api/teams/generate {count,prefix}`, `POST /api/teams/:id/members {users:[…]}`, `DELETE /api/teams/:id/members/:userId`, `POST /api/teams/reset`, `GET|POST|PUT|DELETE /api/servers`, `GET /api/status`, `POST /api/roles/:roleId/members {users:[…]}`, `GET|POST|PUT|DELETE /api/role-panels`. Ilmoitukselle useampi kanava: `"channelIds": ["…","…"]`, ja `"mention": "team"` pingaa tiimikanavilla kunkin tiimin roolia. Kohteeksi voi antaa myös tiimien nimet: `"teams": ["Tiimi 1","Tiimi 2"]` (= niiden kanavat), ja `"serverNames": ["CS2 #1"]` liittää samannimisen serverin osoitteen.
 
-**Tourney-integraatio:** Tourney (turnausjärjestelmä) käyttää näitä rajapintoja suoraan: tiimien synkronointi, otteluiden kuulutukset, tulokset ja mestari. Asetukset tehdään Tourneyn *Discord*-sivulla (botin osoite + `API_TOKEN`).
+`POST /api/members/resolve {users:[…]}` tarkistaa, löytyvätkö nimet palvelimelta, ja palauttaa käyttäjänimen.
+
+**Tourney-integraatio:** Tourney (turnausjärjestelmä) käyttää näitä rajapintoja suoraan: tiimien synkronointi, otteluiden kuulutukset, tiimikohtaiset map ban -linkit, ilmoittautuneiden pelaajien tiimiroolit, tulokset ja mestari. Asetukset tehdään Tourneyn *Discord*-sivulla (botin osoite + `API_TOKEN`).
 
 ## Tietoturva
 
@@ -130,3 +132,7 @@ src/web/server.js       REST-rajapinta + kirjautuminen
 src/web/public/         web-paneeli
 egg-liftup-bot.json     Pterodactyl-muna
 ```
+
+## Tekijä
+
+Liftup-botti: **Mikael Riihimäki**.

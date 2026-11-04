@@ -211,6 +211,16 @@ export function startWeb(ctx) {
   app.post('/api/role-panels', wrap((req) => roles.createPanel(req.body || {})));
   app.put('/api/role-panels/:id', wrap((req) => roles.updatePanel(req.params.id, req.body || {})));
   app.delete('/api/role-panels/:id', wrap((req) => roles.deletePanel(req.params.id)));
+  // Tarkistaa nimet (käyttäjänimi, näyttönimi, ID, mention). Tourneyn ilmoittautumissivu käyttää tätä.
+  app.post('/api/members/resolve', wrap((req) => {
+    const guild = ctx.requireGuild();
+    const input = (Array.isArray(req.body?.users) ? req.body.users : []).slice(0, 100).map((u) => String(u).slice(0, 100));
+    return input.map((raw) => {
+      const { ids } = teams.resolveUsers(guild, [raw]);
+      const m = ids.length ? guild.members.cache.get(ids[0]) : null;
+      return m ? { input: raw, found: true, id: m.id, username: m.user.username, name: m.displayName } : { input: raw, found: false };
+    });
+  }));
   app.get('/api/members/:id', wrap((req) => roles.memberInfo(req.params.id)));
   app.post('/api/roles/:roleId/members', wrap((req) => roles.giveRole(req.params.roleId, req.body?.users ?? req.body?.bulk ?? [])));
   app.delete('/api/roles/:roleId/members/:userId', wrap((req) => roles.takeRole(req.params.userId, req.params.roleId)));

@@ -56,8 +56,18 @@ export function announceService(ctx) {
     }
     if (fallbackRoleIds.length && data().settings.announceChannelId) ids.push(data().settings.announceChannelId);
     const unique = [...new Set(ids)];
-    if (!unique.length && data().settings.announceChannelId) unique.push(data().settings.announceChannelId);
-    if (!unique.length) throw new HttpError(400, 'Valitse vähintään yksi kanava (tai aseta oletuskanava asetuksista)');
+    const askedTeams = Array.isArray(input.teams) && input.teams.length > 0;
+    // Tiimeille osoitettu viesti ei valu hiljaa oletuskanavalle, jos tiimejä ei löytynyt.
+    if (!unique.length && !askedTeams && data().settings.announceChannelId) unique.push(data().settings.announceChannelId);
+    if (!unique.length) {
+      if (askedTeams && notes.length) {
+        throw new HttpError(400, `Tiimejä ei löytynyt botista: ${notes.map((n) => n.team).join(', ')}. Synkronoi tiimit Tourneysta ensin (Teams & players → Sync teams to Discord).`);
+      }
+      if (askedTeams && fallbackRoleIds.length) {
+        throw new HttpError(400, 'Tiimeillä ei ole omia kanavia, eikä botille ole asetettu ilmoitusten oletuskanavaa. Aseta se botin paneelissa (Asetukset) tai synkronoi tiimit kanavien kanssa.');
+      }
+      throw new HttpError(400, 'Valitse vähintään yksi kanava (tai aseta oletuskanava asetuksista)');
+    }
     if (unique.length > 25) throw new HttpError(400, 'Enintään 25 kanavaa kerralla');
     return { channelIds: unique, fallbackRoleIds, notes };
   }
