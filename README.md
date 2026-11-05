@@ -133,6 +133,14 @@ src/web/public/         web-paneeli
 egg-liftup-bot.json     Pterodactyl-muna
 ```
 
+## Botin tila ja kuvaus
+
+Asetukset-sivulla: useampi tila (yksi per rivi), jotka vaihtuvat valitun välin mukaan (väh. 15 s). Rivin alkuun voi kirjoittaa tyypin (`Pelaa:`, `Katsoo:`, `Kuuntelee:`, `Kilpailee:`, `Tila:`), ja muuttujat `{members}`, `{mc}`, `{teams}` ja `{servers}` päivittyvät joka vaihdossa. Samalla sivulla asetetaan botin profiilin kuvaus (About me, `PUT /api/bot/description`).
+
+## Active Developer -merkki
+
+Botti rekisteröi yhden globaalin komennon, `/liftup`, joten profiilissa näkyy *Supports Commands*. Aja `/liftup` kerran, odota enintään 24 h ja hae merkkiä osoitteesta https://discord.com/developers/active-developer.
+
 ## Tekijä
 
 Liftup-botti: **Mikael Riihimäki**.

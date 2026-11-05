@@ -814,17 +814,30 @@ views.asetukset = async () => {
         <label>Tervetulokanava<select name="welcomeChannelId">${channelOptions(s.welcomeChannelId, '— ei tervetuloviestiä —')}</select></label>
         <label>Automaattinen rooli liittyessä<select name="autoRoleId">${roleOptions(s.autoRoleId, '— ei roolia —')}</select></label>
         <label class="full">Tervetuloviesti <span class="small">({user}, {name}, {server})</span><textarea name="welcomeMessage" style="min-height:70px">${esc(s.welcomeMessage)}</textarea></label>
-        <label>Botin tilateksti ("Pelaa …")<input name="presenceText" value="${esc(s.presenceText)}"></label>
         <label>Tiimikanavien kategoria<input name="teamCategoryName" value="${esc(s.teamCategoryName)}"></label>
         <label class="check full"><input type="checkbox" name="exclusiveTeams" ${s.exclusiveTeams ? 'checked' : ''}> Jäsen voi kuulua vain yhteen tiimiin (siirto poistaa vanhan tiimiroolin)</label>
         <div class="full"><button class="btn primary">Tallenna</button></div>
       </form>
       <div class="stack">
+        <form id="presence" class="card form-grid">
+          <h2 class="full">Botin tila ja kuvaus</h2>
+          <label class="full">Tilat – yksi per rivi, vaihtuvat vuorotellen
+            <textarea name="presenceTexts" style="min-height:96px" placeholder="Liftup LAN 26&#10;Katsoo: CS2-turnausta&#10;Minecraft {mc} pelaajaa">${esc((s.presenceTexts?.length ? s.presenceTexts : [s.presenceText].filter(Boolean)).join('\n'))}</textarea>
+            <span class="small muted">Rivin alkuun voi kirjoittaa tyypin: <code>Pelaa:</code> <code>Katsoo:</code> <code>Kuuntelee:</code> <code>Kilpailee:</code> <code>Tila:</code>. Muuttujat: <code>{members}</code> jäseniä, <code>{mc}</code> Minecraft-pelaajat, <code>{teams}</code> tiimejä, <code>{servers}</code> servereitä.</span>
+          </label>
+          <label>Oletustyyppi<select name="presenceType">${[['playing', 'Pelaa …'], ['watching', 'Katsoo …'], ['listening', 'Kuuntelee …'], ['competing', 'Kilpailee …'], ['custom', 'Pelkkä teksti (oma tila)']].map(([v, l]) => `<option value="${v}" ${s.presenceType === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label>Vaihtoväli (sekuntia, väh. 15)<input type="number" name="presenceInterval" min="15" max="3600" value="${esc(s.presenceInterval ?? 30)}"></label>
+          <div class="full"><button class="btn primary">Tallenna tilat</button></div>
+          <label class="full">Botin kuvaus (profiilin "About me", enintään 400 merkkiä)
+            <textarea id="botDesc" maxlength="400" style="min-height:80px" placeholder="${status.bot?.online ? 'Ladataan…' : 'Botti ei ole yhteydessä Discordiin'}"></textarea>
+          </label>
+          <div class="full"><button type="button" class="btn" id="saveDesc">Tallenna kuvaus</button></div>
+        </form>
         <div class="card stack">
           <h2>Slash-komennot</h2>
           <p class="muted small" style="margin:0">Rekisteröidään automaattisesti käynnistyksessä. Jos komennot eivät näy Discordissa, rekisteröi uudelleen.</p>
           <div><button class="btn" id="reg">Rekisteröi komennot</button></div>
-          <p class="muted small" style="margin:0"><code>/tiimi</code> <code>/serverit</code> <code>/ip</code> <code>/mc</code> <code>/varoita</code> <code>/varoitukset</code> <code>/hiljennä</code> <code>/siivoa</code> <code>/ilmoita</code></p>
+          <p class="muted small" style="margin:0"><code>/tiimi</code> <code>/serverit</code> <code>/ip</code> <code>/mc</code> <code>/varoita</code> <code>/varoitukset</code> <code>/hiljennä</code> <code>/siivoa</code> <code>/ilmoita</code> <code>/liftup</code> (globaali)</p>
         </div>
         <div class="card stack">
           <h2>Rajapinta (turnausjärjestelmä)</h2>
@@ -839,6 +852,9 @@ views.asetukset = async () => {
       </div>
     </div>`;
   $('#set').onsubmit = async (e) => { e.preventDefault(); await act(e.submitter, () => api('PUT', '/settings', formData(e.target)), 'Asetukset tallennettu'); };
+  $('#presence').onsubmit = async (e) => { e.preventDefault(); await act(e.submitter, () => api('PUT', '/settings', formData(e.target)), 'Tilat tallennettu'); };
+  api('GET', '/bot/description').then((r) => { if (r.description !== null) $('#botDesc').value = r.description; }).catch(() => {});
+  $('#saveDesc').onclick = (e) => act(e.target, () => api('PUT', '/bot/description', { description: $('#botDesc').value }), 'Kuvaus päivitetty – näkyy botin profiilissa');
   $('#reg').onclick = (e) => act(e.target, () => api('POST', '/commands/register'), (r) => `Rekisteröity ${r.count} komentoa`);
 };
 

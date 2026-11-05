@@ -124,15 +124,28 @@ export function startWeb(ctx) {
     };
   }));
 
+  // Botin profiilin kuvaus ("About me" = sovelluksen kuvaus)
+  app.get('/api/bot/description', wrap(async () => ({ description: await ctx.services.presence.getDescription() })));
+  app.put('/api/bot/description', wrap(async (req) => {
+    if (!ctx.client?.application) throw new HttpError(503, 'Botti ei ole yhteydessä Discordiin');
+    await ctx.services.presence.setDescription(req.body?.description);
+    return { description: await ctx.services.presence.getDescription() };
+  }));
+
   app.post('/api/commands/register', wrap(async () => ({ count: await registerCommands(ctx) })));
 
   // ---------- Asetukset ----------
-  const SETTINGS_KEYS = ['announceChannelId', 'modLogChannelId', 'welcomeChannelId', 'welcomeMessage', 'autoRoleId', 'serverListChannelId', 'presenceText', 'exclusiveTeams', 'teamCategoryName'];
+  const SETTINGS_KEYS = ['announceChannelId', 'modLogChannelId', 'welcomeChannelId', 'welcomeMessage', 'autoRoleId', 'serverListChannelId', 'presenceText', 'presenceTexts', 'presenceInterval', 'presenceType', 'exclusiveTeams', 'teamCategoryName'];
   app.get('/api/settings', wrap(() => ctx.store.data.settings));
   app.put('/api/settings', wrap(async (req) => {
     const s = ctx.store.data.settings;
     const prevList = s.serverListChannelId;
-    Object.assign(s, pick(req.body || {}, SETTINGS_KEYS));
+    const body = { ...(req.body || {}) };
+    if (typeof body.presenceTexts === 'string') body.presenceTexts = body.presenceTexts.split(/\r?\n/);
+    if (Array.isArray(body.presenceTexts)) body.presenceTexts = body.presenceTexts.map((t) => String(t).trim().slice(0, 128)).filter(Boolean).slice(0, 20);
+    if (body.presenceInterval !== undefined) body.presenceInterval = Math.max(15, Math.min(3600, Number(body.presenceInterval) || 30));
+    if (body.presenceType !== undefined && !['playing', 'watching', 'listening', 'competing', 'custom'].includes(body.presenceType)) body.presenceType = 'playing';
+    Object.assign(s, pick(body, SETTINGS_KEYS));
     if (prevList !== s.serverListChannelId) s.serverListMessageId = '';
     ctx.store.save();
     setPresence(ctx);

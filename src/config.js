@@ -30,7 +30,8 @@ export const config = {
   mcRconPassword: env.MC_RCON_PASSWORD || '',
 
   // Valinnainen Pterodactyl-integraatio (Client API -avain, alkaa ptlc_)
-  pteroUrl: (env.PTERO_URL || '').replace(/\/+$/, ''),
+  // "192.168.1.5" → "http://192.168.1.5": ilman http(s)://-alkua fetch ei osaa lukea osoitetta.
+  pteroUrl: (() => { const u = (env.PTERO_URL || '').trim().replace(/\/+$/, ''); return u && !/^https?:\/\//i.test(u) ? `http://${u}` : u; })(),
   pteroApiKey: env.PTERO_API_KEY || '',
 };
 

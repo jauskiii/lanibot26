@@ -15,6 +15,9 @@ const defaults = () => ({
     serverListChannelId: '',
     serverListMessageId: '',
     presenceText: 'Liftup LAN',
+    presenceTexts: [],        // useampi tila, vaihtuu presenceInterval sekunnin välein (tyhjä = presenceText)
+    presenceInterval: 30,
+    presenceType: 'playing',  // playing | watching | listening | competing | custom
     exclusiveTeams: true, // jäsen voi olla vain yhdessä turnaustiimissä kerrallaan
     teamCategoryId: '',
     teamCategoryName: 'Turnaus',

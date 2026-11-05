@@ -1,4 +1,4 @@
-import { ActivityType, Client, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { buildCommands, buildGlobalCommands, commandHandler } from './commands.js';
 
 export async function registerCommands(ctx) {
@@ -16,8 +16,7 @@ export async function registerCommands(ctx) {
 }
 
 export function setPresence(ctx) {
-  const text = ctx.store.data.settings.presenceText;
-  ctx.client?.user?.setPresence({ activities: text ? [{ name: text, type: ActivityType.Playing }] : [], status: 'online' });
+  ctx.services.presence?.start();
 }
 
 export async function startBot(ctx) {

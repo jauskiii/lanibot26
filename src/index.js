@@ -7,6 +7,7 @@ import { minecraftService } from './bot/minecraft.js';
 import { moderationService } from './bot/moderation.js';
 import { pteroService } from './bot/pterodactyl.js';
 import { roleService } from './bot/roles.js';
+import { presenceService } from './bot/presence.js';
 import { startBot } from './bot/client.js';
 import { startWeb } from './web/server.js';
 
@@ -19,6 +20,7 @@ ctx.services.minecraft = minecraftService(ctx);
 ctx.services.moderation = moderationService(ctx);
 ctx.services.ptero = pteroService(ctx);
 ctx.services.roles = roleService(ctx);
+ctx.services.presence = presenceService(ctx);
 
 ctx.log('info', 'Liftup-botti käynnistyy…');
 validateConfig(ctx.log);
